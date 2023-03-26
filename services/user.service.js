@@ -30,6 +30,11 @@ const userService = {
   deleteUser: async (userId) => {
     const user = await User.findByIdAndDelete(userId);
     return user;
+  },
+
+  insertMany: async(data) => {
+    const users = await User.insertMany(data)
+    return users
   }
 };
 
