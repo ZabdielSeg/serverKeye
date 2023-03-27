@@ -1,11 +1,12 @@
+require("dotenv").config();
 const bodyParser = require('body-parser');
 const express = require('express');
 const app = express();
-const mongoose = require('mongoose')
+const mongoose = require('mongoose');
+const cors = require('cors')
 
 const PORT = process.env.PORT || 3001
-const MONGODB_URI = 'mongodb://localhost:27017/recipe-app';
-
+const MONGODB_URI = process.env.MONGODB_URI;
 // Connection to the database "recipe-app"
 mongoose
   .connect(MONGODB_URI, {
@@ -15,9 +16,6 @@ mongoose
   .then(x => {
     console.log(`Connected to the database: "${x.connection.name}"`);
   })
-  .then(() => {
-    // Run your code here, after you have insured that the connection was made
-  })
   .catch(error => {
     console.error('Error connecting to the database', error);
   });
@@ -26,11 +24,17 @@ mongoose
 app.use(bodyParser.json())
 app.use(bodyParser.urlencoded({ extended: false }))
 
+app.use(cors({
+  origin: process.env.FRONTEND_URL_DEVELOPMENT,
+  credentials: true
+}));
+
 app.get('/', (req, res) => {
   res.send('Hola mi server en express')
 });
 
-app.use('/user', require('./routes/user.routes'))
+app.use('/user', require('./routes/user.routes'));
+app.use('/auth', require('./routes/auth.routes'));
 
 app.listen(PORT, () => {
   console.log(`Listening on port: ${PORT}`)
