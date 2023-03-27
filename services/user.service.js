@@ -1,6 +1,7 @@
 const User = require('../models/User.schema');
 
 const userService = {
+  
   createUser: async (userData) => {
     const newUser = new User(userData);
     await newUser.save();
@@ -13,7 +14,7 @@ const userService = {
   },
 
   getUserByUserName: async (username) => {
-    const user = await User.findOne({username}, "username");
+    const user = await User.findOne({username});
     return user
   },
 

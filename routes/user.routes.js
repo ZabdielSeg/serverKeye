@@ -4,23 +4,29 @@ const multer = require('multer');
 const upload = multer({ dest: 'uploads/' });
 const XLSX = require('xlsx');
 const fs = require('fs');
+const bcrypt = require('bcrypt');
+const { verifyToken } = require('../middlewares/jwt.middleware');
+const saltRounds = 10;
 
-router.post('/create-user', async (req, res, next) => {
-    const { username, password } = req.body;
+router.post('/create-user', verifyToken, async (req, res, next) => {
+    const { internalID, username, password, role, date, punchInHour, punchOutHour } = req.body;
     try {
-
         const userFound = await userService.getUserByUserName(username);
         if (userFound) return res.status(401).json({ errorMessage: 'This user already exists' })
 
-        const userSaved = await userService.createUser({ username, password })
+        const salt = bcrypt.genSaltSync(saltRounds);
+        const hashedPassword = bcrypt.hashSync(password, salt);
+
+        const userSaved = await userService.createUser({ username, password: hashedPassword, role, internalID, punchInHour, punchOutHour, date })
         return res.status(201).json(userSaved)
 
     } catch (error) {
-        return res.status(500).json({ errorMessage: 'An internal server error occured' })
+        console.log(error)
+        return res.status(500).json({ errorMessage: error.message })
     }
 });
 
-router.get('/all-users', async (req, res, next) => {
+router.get('/all-users', verifyToken, async (req, res, next) => {
     try {
         const allUsers = await userService.getAllUsers()
         return res.status(200).json(allUsers)
@@ -29,11 +35,11 @@ router.get('/all-users', async (req, res, next) => {
     }
 });
 
-router.put('/update-user/:userID', async (req, res, next) => {
+router.put('/update-user/:userID', verifyToken, async (req, res, next) => {
     const { userID } = req.params;
-    const { username, password } = req.body;
+    const { internalID, username, password, role, date, punchInHour, punchOutHour } = req.body;
     try {
-        const userUpdated = await userService.updateUser(userID, { username, password })
+        const userUpdated = await userService.updateUser(userID, { internalID, username, password, role, date, punchInHour, punchOutHour }, {new: true})
         return res.status(200).json(userUpdated)
     } catch (error) {
         return res.status(500).json({ errorMessage: 'An internal server error occured' })
@@ -41,9 +47,10 @@ router.put('/update-user/:userID', async (req, res, next) => {
 })
 
 
-router.delete('/delete-user/:userID', async (req, res, next) => {
+router.delete('/delete-user/:userID', verifyToken, async (req, res, next) => {
+    const { userID } = req.params;
     try {
-        const userDeleted = await userService.deleteUser()
+        const userDeleted = await userService.deleteUser(userID)
         return res.status(200).json(userDeleted)
     } catch (error) {
         return res.status(500).json({ errorMessage: 'An internal server error occured' })
@@ -51,30 +58,35 @@ router.delete('/delete-user/:userID', async (req, res, next) => {
 })
 
 
-router.post('/upload-file', upload.single('archivo'), async (req, res, next) => {
+router.post('/upload-file', verifyToken, upload.single('archivo'), async (req, res, next) => {
+    const excelDocument = req.file
     try {
-        const archivo = req.file
-        if (!archivo) return res.status(400).json({ errorMessage: 'Please select a document' });
+        if (!excelDocument) return res.status(400).json({ errorMessage: 'Please select a document' });
 
-        const workbook = XLSX.readFile(archivo.path);
+        const workbook = XLSX.readFile(excelDocument.path);
         const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-        // const n = Number(workbook.Strings.Unique)
-        const usernames = [];
-        const usersData = [];
-        for (let i = 2; i < n; i++) {
-            if (usernames.includes(worksheet[`A${i}`].v)) {
+        const totalRowsNumber = Number(workbook.Strings.Unique)
+        let usernames = [];
+        let usersData = [];
+        for (let i = 2; i < totalRowsNumber; i++) {
+            if (usernames.includes(worksheet[`A${i}`].w)) {
                 continue;
             }
-            usernames.push(worksheet[`A${i}`].v)
+            usernames.push(worksheet[`A${i}`].w)
+            const dateToSave = new Date(worksheet[`C${i}`].w)
             const user = {
-                username: worksheet[`A${i}`].v,
-                password: worksheet[`B${i}`].v
+                internalID: worksheet[`A${i}`].w,
+                username: worksheet[`B${i}`].w,
+                role: 'User',
+                date: dateToSave,
+                punchInHour: worksheet[`D${i}`].w,
+                punchOutHour: worksheet[`E${i}`].w
             }
 
             usersData.push(user)
         }
 
-        fs.unlinkSync(archivo.path);
+        fs.unlinkSync(excelDocument.path);
 
         const usersSaved = await userService.insertMany(usersData)
         return res.status(200).json(usersSaved)
