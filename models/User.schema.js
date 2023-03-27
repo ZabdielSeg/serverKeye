@@ -2,6 +2,7 @@ const { Schema, model } = require('mongoose');
 
 const userSchema = new Schema(
     {
+        internalID: Number,
         username: {
             type: String,
             required: [true, 'Please enter a username']
@@ -11,8 +12,10 @@ const userSchema = new Schema(
         },
         role: {
             type: String,
-            enum: ['Admin', 'Major']
+            enum: ['Admin', 'Major', 'User'],
+            default: 'User'
         },
+        date: Date,
         punchInHour: String,
         punchOutHour: String,
     },
